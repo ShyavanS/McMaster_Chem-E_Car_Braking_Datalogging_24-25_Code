@@ -200,9 +200,9 @@ void loop()
   Serial.print(",");
   Serial.print(temperatureC);
   Serial.print(",");
-  Serial.println(ecValue);
+  Serial.print(ecValue);
   Serial.print(",");
-  Serial.print(x_k_temp);
+  Serial.println(x_k_temp);
   // Serial.print(",");
   // Serial.println(speed);
 
