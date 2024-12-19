@@ -82,7 +82,7 @@ Returns:     void
 /*
 Description: Subroutine to implement Kalman filtering on conductivity sensor data.
 Inputs:      void
-Outputs:     (double)x_K_cond, (double)p_k_cond
+Outputs:     (double)x_k_cond, (double)p_k_cond
 Parameters:  (double)input
 Returns:     (double)x_k_cond
 */
@@ -102,7 +102,7 @@ double kalman_filter_conductivity(double input) // Kalman filtering algorithm
 /*
 Description: Subroutine to implement Kalman filtering on temperature sensor data.
 Inputs:      void
-Outputs:     (double)x_K_temp, (double)p_k_temp
+Outputs:     (double)x_k_temp, (double)p_k_temp
 Parameters:  (double)input
 Returns:     (double)x_k_temp
 */
