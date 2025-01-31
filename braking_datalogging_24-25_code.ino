@@ -19,7 +19,7 @@ temperature sensor. All data is output via serial to Excel Data Streamer.
 #include <DallasTemperature.h>
 // #include <Servo.h>
 
-#define ONE_WIRE_BUS 2  // Pin for the DS18B20 data line
+#define ONE_WIRE_BUS 2 // Pin for the DS18B20 data line
 
 // #define POT_PIN A5  // Pin for potentiometer to var stir speed
 // #define MOTOR_1 10  // Motor driver PWM pin 1
@@ -28,20 +28,20 @@ temperature sensor. All data is output via serial to Excel Data Streamer.
 
 // Servo servo; // Create servo object
 
-OneWire oneWire(ONE_WIRE_BUS);        // create a OneWire instance to communicate with the sensor
-DallasTemperature sensors(&oneWire);  // pass oneWire reference to Dallas Temperature sensor
+OneWire oneWire(ONE_WIRE_BUS);       // create a OneWire instance to communicate with the sensor
+DallasTemperature sensors(&oneWire); // pass oneWire reference to Dallas Temperature sensor
 
 // variables to store temperature
-double temperatureC;  // Current temperature
-double initTemp;      // Initial temperature for differential calculation
+double temperatureC; // Current temperature
+double initTemp;     // Initial temperature for differential calculation
 
 // KALMAN FILTER variables
-double x_temp;  // Filtered temperature
-double p_temp;  // Initial error covariance
+double x_temp; // Filtered temperature
+double p_temp; // Initial error covariance
 
 // Process noise and measurement noise
-double q_temp;  // Process noise covariance
-double r_temp;  // Measurement noise covariance
+double q_temp; // Process noise covariance
+double r_temp; // Measurement noise covariance
 
 // bool run = false; // Check if the code has run before or only started
 
@@ -70,22 +70,22 @@ Outputs:     (double)x_temp, (double)p_temp
 Parameters:  (double)x_k, (double)p_k, (double)q, (double)r, (double)input
 Returns:     void
 */
-void kalman_filter(double x_k, double p_k, double q, double r, double input)  // Kalman filtering algorithm
+void kalman_filter(double x_k, double p_k, double q, double r, double input) // Kalman filtering algorithm
 {
   // Kalman filter prediction
-  double x_k_minus = x_k;      // Predicted next state estimate
-  double p_k_minus = p_k + q;  // Predicted error covariance for the next state
+  double x_k_minus = x_k;     // Predicted next state estimate
+  double p_k_minus = p_k + q; // Predicted error covariance for the next state
 
   // Kalman filter update
 
   /* Kalman gain: Calculated based on the predicted error covariance
   and the measurement noise covariance, used to update the
   state estimate (x_k) and error covariance (p_k). */
-  double k = p_k_minus / (p_k_minus + r);  // Kalman gain
+  double k = p_k_minus / (p_k_minus + r); // Kalman gain
 
   // Comparison with actual sensor reading
-  x_k = x_k_minus + k * (input - x_k_minus);  // Updated state estimate
-  p_k = (1 - k) * p_k_minus;                  // Updated error covariance
+  x_k = x_k_minus + k * (input - x_k_minus); // Updated state estimate
+  p_k = (1 - k) * p_k_minus;                 // Updated error covariance
 
   // Output results and update global variables
   x_temp = x_k;
@@ -99,18 +99,19 @@ Outputs:     void
 Parameters:  void
 Returns:     void
 */
-void setup() {
-  Serial.begin(115200);  // Start serial communication (adjust baud rate as needed)
+void setup()
+{
+  Serial.begin(115200); // Start serial communication (adjust baud rate as needed)
 
-  sensors.begin();                        // Initialize the DS18B20 sensor
-  sensors.requestTemperatures();          // Request temperature from all devices on the bus
-  initTemp = sensors.getTempCByIndex(0);  // Get temperature in Celsius
+  sensors.begin();                       // Initialize the DS18B20 sensor
+  sensors.requestTemperatures();         // Request temperature from all devices on the bus
+  initTemp = sensors.getTempCByIndex(0); // Get temperature in Celsius
 
   // Initialize Kalman filter parameters
-  x_temp = initTemp;  // Initial state estimate
-  p_temp = 0.1;       // Initial error covariance
-  q_temp = 0.01;      // Process noise covariance
-  r_temp = 0.5;       // Measurement noise covariance
+  x_temp = initTemp; // Initial state estimate
+  p_temp = 0.1;      // Initial error covariance
+  q_temp = 0.01;     // Process noise covariance
+  r_temp = 0.5;      // Measurement noise covariance
 
   // Set stirring motor PWM and potentiometer pin modes
   // pinMode(MOTOR_1, OUTPUT);
@@ -133,7 +134,8 @@ Outputs:     void
 Parameters:  void
 Returns:     void
 */
-void loop() {
+void loop()
+{
   // Run ENA and ENB at max
   // analogWrite(6, 255); // ENA pin
   // analogWrite(9, 255); // ENB pin
@@ -159,8 +161,8 @@ void loop() {
   //   analogWrite(MOTOR_2, speed); // Set motor to spin according to potentiometer
   // }
 
-  sensors.requestTemperatures();              // Request temperature from all devices on the bus
-  temperatureC = sensors.getTempCByIndex(0);  // Get temperature in Celsius
+  sensors.requestTemperatures();             // Request temperature from all devices on the bus
+  temperatureC = sensors.getTempCByIndex(0); // Get temperature in Celsius
 
   // Update kalman filter for temperature
   kalman_filter(x_temp, p_temp, q_temp, r_temp, temperatureC);
