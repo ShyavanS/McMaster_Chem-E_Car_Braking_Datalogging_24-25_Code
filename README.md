@@ -4,7 +4,6 @@ A temporary datalogging codebase for the McMaster Chem-E Car Team Braking Sub-Te
 This project uses an Arduino UNO microcontroller programmed in the Arduino programming language. A simple setup for them to gather data for their reaction while the current car is still being created. All data is output via serial to Excel Data Streamer.
 
 The major components used are as follows:<br />
-1 - DFR0300-H Analog Conductivity Sensor<br />
 1 - DS18B20 Temperature Sensor (for monitoring stopping reaction progress)<br />
 1 - Arduino UNO Microcontroller<br />
 

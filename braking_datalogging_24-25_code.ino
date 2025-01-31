@@ -15,14 +15,11 @@ for the stirring motor, a potentiometer to vary the stirring speed, and a DS18B2
 temperature sensor. All data is output via serial to Excel Data Streamer.
 */
 
-#include "DFRobot_EC10.h"
-#include <EEPROM.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 // #include <Servo.h>
 
-#define ONE_WIRE_BUS 2 // Pin for the DS18B20 data line
-#define EC_PIN A1      // Pin for the conductivity probe
+#define ONE_WIRE_BUS 2  // Pin for the DS18B20 data line
 
 // #define POT_PIN A5  // Pin for potentiometer to var stir speed
 // #define MOTOR_1 10  // Motor driver PWM pin 1
@@ -31,33 +28,20 @@ temperature sensor. All data is output via serial to Excel Data Streamer.
 
 // Servo servo; // Create servo object
 
-OneWire oneWire(ONE_WIRE_BUS);       // create a OneWire instance to communicate with the sensor
-DallasTemperature sensors(&oneWire); // pass oneWire reference to Dallas Temperature sensor
-
-DFRobot_EC10 ec; // Create an instance for the conductivity probe
+OneWire oneWire(ONE_WIRE_BUS);        // create a OneWire instance to communicate with the sensor
+DallasTemperature sensors(&oneWire);  // pass oneWire reference to Dallas Temperature sensor
 
 // variables to store temperature
-double temperatureC; // Current temperature
-double initTemp;     // Initial temperature for differential calculation
-
-// variables for conductivity probe
-double voltage;
-double ecValue;
+double temperatureC;  // Current temperature
+double initTemp;      // Initial temperature for differential calculation
 
 // KALMAN FILTER variables
-// temp sensor
-double r_temp = 0.0573; // measurment noise variance
-double q_temp = 0.01;   // process noise variance -play around later to improve results
-double x_k_temp = 0;    // initializing estimated status
-double p_k_temp = 0;    // initializing error covariance
-double K_temp = 0;      // initializing Kalman gain
+double x_temp;  // Filtered temperature
+double p_temp;  // Initial error covariance
 
-// conductivity
-double r_cond = 0.05; // measurment noise variance -get value
-double q_cond = 0.01; // process noise variance -play around later to improve results
-double x_k_cond = 0;  // initializing estimated status
-double p_k_cond = 0;  // initializing error covariance
-double K_cond = 0;    // initializing Kalman gain
+// Process noise and measurement noise
+double q_temp;  // Process noise covariance
+double r_temp;  // Measurement noise covariance
 
 // bool run = false; // Check if the code has run before or only started
 
@@ -66,57 +50,46 @@ double K_cond = 0;    // initializing Kalman gain
 // unsigned int speed;
 
 /*
-Description: Subroutine to dump the contents of the dumping mechanism using the servo.
+Description: Subroutine to empty the contents of the cup using the servo.
 Inputs:      void
 Outputs:     void
 Parameters:  void
 Returns:     void
 */
-// void servo_dump() // Dump contents of bowl into braking vessel with servo
+// void servo_dump()  // Open ball valve with servo to empty cup
 // {
-//   servo.write(180); // Rotate to 180 deg position without delay
-//   delay(1000);      // Wait 1 s
-//   servo.write(0);   // Return to default position
+//   servo.writeMicroseconds(1500);  // Rotate to 90 deg position without delay
+//   delay(6000);                    // Wait 6 s to empty
+//   servo.writeMicroseconds(500);   // Return to default position
 // }
-
-/*
-Description: Subroutine to implement Kalman filtering on conductivity sensor data.
-Inputs:      void
-Outputs:     (double)x_k_cond, (double)p_k_cond
-Parameters:  (double)input
-Returns:     (double)x_k_cond
-*/
-double kalman_filter_conductivity(double input) // Kalman filtering algorithm
-{
-  double x_k_cond_min1 = x_k_cond;
-  double p_k_cond_min1 = p_k_cond;
-
-  K_cond = p_k_cond_min1 / (p_k_cond_min1 + r_cond); // updating Kalman gain
-  // original equation is  K = p_K*H / (H*H*p_k+r) but measurment map scalar is 1)
-  x_k_cond = x_k_cond_min1 + K_cond * (input - x_k_cond_min1); // update state estimate
-  p_k_cond = (1 - K_cond) * p_k_cond_min1 + q_cond;            // update error covariance
-
-  return x_k_cond; // filtered value
-}
 
 /*
 Description: Subroutine to implement Kalman filtering on temperature sensor data.
 Inputs:      void
-Outputs:     (double)x_k_temp, (double)p_k_temp
-Parameters:  (double)input
-Returns:     (double)x_k_temp
+Outputs:     (double)x_temp, (double)p_temp
+Parameters:  (double)x_k, (double)p_k, (double)q, (double)r, (double)input
+Returns:     void
 */
-double kalman_filter_temperature(double input) // Kalman filtering algorithm
+void kalman_filter(double x_k, double p_k, double q, double r, double input)  // Kalman filtering algorithm
 {
-  double x_k_temp_min1 = x_k_temp;
-  double p_k_temp_min1 = p_k_temp;
+  // Kalman filter prediction
+  double x_k_minus = x_k;      // Predicted next state estimate
+  double p_k_minus = p_k + q;  // Predicted error covariance for the next state
 
-  K_temp = p_k_temp_min1 / (p_k_temp_min1 + r_temp); // updating Kalman gain
-  // original equation is  K = p_K*H / (H*H*p_k+r) but measurment map scalar is 1)
-  x_k_temp = x_k_temp_min1 + K_temp * (input - x_k_temp_min1); // update state estimate
-  p_k_temp = (1 - K_temp) * p_k_temp_min1 + q_temp;            // update error covariance
+  // Kalman filter update
 
-  return x_k_temp; // filtered value
+  /* Kalman gain: Calculated based on the predicted error covariance
+  and the measurement noise covariance, used to update the
+  state estimate (x_k) and error covariance (p_k). */
+  double k = p_k_minus / (p_k_minus + r);  // Kalman gain
+
+  // Comparison with actual sensor reading
+  x_k = x_k_minus + k * (input - x_k_minus);  // Updated state estimate
+  p_k = (1 - k) * p_k_minus;                  // Updated error covariance
+
+  // Output results and update global variables
+  x_temp = x_k;
+  p_temp = p_k;
 }
 
 /*
@@ -126,17 +99,18 @@ Outputs:     void
 Parameters:  void
 Returns:     void
 */
-void setup()
-{
-  Serial.begin(115200); // Start serial communication (adjust baud rate as needed)
+void setup() {
+  Serial.begin(115200);  // Start serial communication (adjust baud rate as needed)
 
-  ec.begin();
-  sensors.begin();                       // Initialize the DS18B20 sensor
-  sensors.requestTemperatures();         // Request temperature from all devices on the bus
-  initTemp = sensors.getTempCByIndex(0); // Get temperature in Celsius
+  sensors.begin();                        // Initialize the DS18B20 sensor
+  sensors.requestTemperatures();          // Request temperature from all devices on the bus
+  initTemp = sensors.getTempCByIndex(0);  // Get temperature in Celsius
 
   // Initialize Kalman filter parameters
-  x_k_temp = initTemp; // Initial state estimate
+  x_temp = initTemp;  // Initial state estimate
+  p_temp = 0.1;       // Initial error covariance
+  q_temp = 0.01;      // Process noise covariance
+  r_temp = 0.5;       // Measurement noise covariance
 
   // Set stirring motor PWM and potentiometer pin modes
   // pinMode(MOTOR_1, OUTPUT);
@@ -149,7 +123,7 @@ void setup()
 
   // Initialize servo to default position
   // servo.attach(servo_pwm);
-  // servo.write(0);
+  // servo.writeMicroseconds(500);
 }
 
 /*
@@ -159,8 +133,7 @@ Outputs:     void
 Parameters:  void
 Returns:     void
 */
-void loop()
-{
+void loop() {
   // Run ENA and ENB at max
   // analogWrite(6, 255); // ENA pin
   // analogWrite(9, 255); // ENB pin
@@ -186,25 +159,18 @@ void loop()
   //   analogWrite(MOTOR_2, speed); // Set motor to spin according to potentiometer
   // }
 
-  sensors.requestTemperatures();             // Request temperature from all devices on the bus
-  temperatureC = sensors.getTempCByIndex(0); // Get temperature in Celsius
+  sensors.requestTemperatures();              // Request temperature from all devices on the bus
+  temperatureC = sensors.getTempCByIndex(0);  // Get temperature in Celsius
 
   // Update kalman filter for temperature
-  x_k_temp = kalman_filter_temperature(temperatureC);
-
-  voltage = analogRead(EC_PIN) / 1024.0 * 5000; // read the voltage
-  ecValue = ec.readEC(voltage, x_k_temp);       // convert voltage to EC with temperature compensation
+  kalman_filter(x_temp, p_temp, q_temp, r_temp, temperatureC);
 
   // Output all necessary data for datalogging in CSV format for Excel Data Streamer
   Serial.print(millis());
   Serial.print(",");
   Serial.print(temperatureC);
   Serial.print(",");
-  Serial.print(ecValue);
-  Serial.print(",");
-  Serial.println(x_k_temp);
+  Serial.println(x_temp);
   // Serial.print(",");
   // Serial.println(speed);
-
-  ec.calibration(voltage, x_k_temp); // calibration process by Serail CMD
 }
